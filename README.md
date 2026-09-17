@@ -16,10 +16,9 @@ Relay is designed for people who use AI for ongoing work—not just one-off ques
 
 Longweis Relay is currently available as a macOS private beta.
 
-- **General API** — connect Relay to compatible AI tooling and runtimes
-- **Codex** — use Relay alongside supported Codex workflows
+Use the **General API** to connect Relay with compatible AI tooling and runtimes. Access is provisioned through beta enrollment.
 
-These are equal access paths to the same Relay product.
+For setup details, see the [Getting Started guide](docs/GETTING_STARTED.md).
 
 ## Private beta
 
