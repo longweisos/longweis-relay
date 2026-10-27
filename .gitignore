@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.coverage
+.DS_Store
+build/
+dist/
+release/
+*.egg-info/
+.venv/

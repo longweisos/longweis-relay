@@ -1,0 +1,46 @@
+name: Public client bug
+description: Report a reproducible problem in the auditable local client.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, customer content, private prompts, account data, or exploit payloads. Use the private security contact in SECURITY.md for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Client version
+      description: Output from `relay-client --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Secret-free doctor result
+      description: Paste only output that you reviewed and confirmed contains no secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use a non-sensitive minimal example.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
