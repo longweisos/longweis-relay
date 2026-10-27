@@ -1,0 +1,33 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "created": "2026-10-27T00:00:00Z",
+    "creators": [
+      "Organization: Longweis OS"
+    ]
+  },
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://longweisos.com/spdx/longweis-relay-client/0.1.0",
+  "name": "longweis-relay-client-0.1.0",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-longweis-relay-client",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "longweis-relay-client",
+      "supplier": "Organization: Longweis OS",
+      "versionInfo": "0.1.0"
+    }
+  ],
+  "relationships": [
+    {
+      "relatedSpdxElement": "SPDXRef-Package-longweis-relay-client",
+      "relationshipType": "DESCRIBES",
+      "spdxElementId": "SPDXRef-DOCUMENT"
+    }
+  ],
+  "spdxVersion": "SPDX-2.3"
+}

@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Build normalized, verified local release archives and checksums."""
+
+import argparse
+import gzip
+import hashlib
+import io
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tarfile
+import tempfile
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path, PurePosixPath
+from typing import Dict, Sequence
+
+
+ROOT = Path(__file__).resolve().parents[1]
+VERSION = "0.1.0"
+SOURCE_DATE_EPOCH = 1793059200
+SDIST_NAME = "longweis-relay-client-%s.tar.gz" % VERSION
+WHEEL_NAME = "longweis_relay_client-%s-py3-none-any.whl" % VERSION
+
+
+def _safe_name(value: str) -> PurePosixPath:
+    path = PurePosixPath(value)
+    if path.is_absolute() or not path.parts or any(part in ("", ".", "..") for part in path.parts):
+        raise ValueError("build archive contains an unsafe path")
+    return path
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _normalized_mode(mode: int, directory: bool = False) -> int:
+    if directory:
+        return 0o755
+    return 0o755 if mode & 0o111 else 0o644
+
+
+def _normalize_sdist(source: Path, destination: Path) -> None:
+    entries = []
+    with tarfile.open(source, "r:gz") as archive:
+        for item in archive.getmembers():
+            _safe_name(item.name)
+            if item.issym() or item.islnk() or item.isdev() or item.isfifo():
+                raise ValueError("source archive contains a special file")
+            if not (item.isfile() or item.isdir()):
+                raise ValueError("source archive contains an unsupported entry")
+            content = b""
+            if item.isfile():
+                extracted = archive.extractfile(item)
+                if extracted is None:
+                    raise ValueError("source archive entry is unreadable")
+                content = extracted.read()
+            entries.append((item.name, item.isdir(), item.mode, content))
+    with destination.open("wb") as raw:
+        with gzip.GzipFile(
+            filename="",
+            mode="wb",
+            compresslevel=9,
+            fileobj=raw,
+            mtime=SOURCE_DATE_EPOCH,
+        ) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
+                for name, is_directory, source_mode, content in sorted(entries):
+                    item = tarfile.TarInfo(name)
+                    item.type = tarfile.DIRTYPE if is_directory else tarfile.REGTYPE
+                    item.size = 0 if is_directory else len(content)
+                    item.mode = _normalized_mode(source_mode, is_directory)
+                    item.uid = 0
+                    item.gid = 0
+                    item.uname = ""
+                    item.gname = ""
+                    item.mtime = SOURCE_DATE_EPOCH
+                    archive.addfile(item, None if is_directory else io.BytesIO(content))
+
+
+def _normalize_wheel(source: Path, destination: Path) -> None:
+    timestamp = datetime.fromtimestamp(SOURCE_DATE_EPOCH, timezone.utc)
+    zip_time = (timestamp.year, timestamp.month, timestamp.day, timestamp.hour, timestamp.minute, timestamp.second)
+    entries = []
+    with zipfile.ZipFile(source) as archive:
+        for item in archive.infolist():
+            _safe_name(item.filename)
+            mode = (item.external_attr >> 16) & 0xFFFF
+            if stat.S_ISLNK(mode) or item.is_dir():
+                if stat.S_ISLNK(mode):
+                    raise ValueError("wheel contains a symbolic link")
+                continue
+            entries.append((item.filename, mode, archive.read(item)))
+    with zipfile.ZipFile(
+        destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for name, source_mode, content in sorted(entries):
+            item = zipfile.ZipInfo(name, date_time=zip_time)
+            item.create_system = 3
+            item.compress_type = zipfile.ZIP_DEFLATED
+            item.external_attr = (_normalized_mode(source_mode) | stat.S_IFREG) << 16
+            archive.writestr(item, content)
+
+
+def build(output: Path) -> Dict[str, object]:
+    output = output.resolve()
+    if output.exists():
+        if output.is_symlink() or not output.is_dir() or any(output.iterdir()):
+            raise ValueError("release output must be a new or empty directory")
+    else:
+        output.mkdir(parents=True, mode=0o755)
+    environment = dict(os.environ)
+    environment["SOURCE_DATE_EPOCH"] = str(SOURCE_DATE_EPOCH)
+    with tempfile.TemporaryDirectory(prefix="relay-client-release-") as temporary:
+        staging = Path(temporary)
+        subprocess.run(
+            [
+                sys.executable,
+                "setup.py",
+                "sdist",
+                "--dist-dir",
+                str(staging),
+                "bdist_wheel",
+                "--dist-dir",
+                str(staging),
+            ],
+            cwd=str(ROOT),
+            env=environment,
+            check=True,
+        )
+        _normalize_sdist(staging / SDIST_NAME, output / SDIST_NAME)
+        _normalize_wheel(staging / WHEEL_NAME, output / WHEEL_NAME)
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "verify_release.py"), str(output)],
+        cwd=str(ROOT),
+        check=True,
+    )
+    hashes = {
+        name: _sha256(output / name) for name in (SDIST_NAME, WHEEL_NAME)
+    }
+    checksum_path = output / "SHA256SUMS"
+    checksum_path.write_text(
+        "".join("%s  %s\n" % (hashes[name], name) for name in sorted(hashes)),
+        encoding="ascii",
+    )
+    shutil.copy2(ROOT / "docs" / "SBOM.spdx.json", output / "SBOM.spdx.json")
+    return {
+        "status": "built_and_verified",
+        "version": VERSION,
+        "source_date_epoch": SOURCE_DATE_EPOCH,
+        "output": str(output),
+        "artifacts": hashes,
+    }
+
+
+def main(arguments: Sequence[str] = ()) -> int:
+    parser = argparse.ArgumentParser(description="Build Relay public-client release")
+    parser.add_argument("--output", required=True, type=Path)
+    parsed = parser.parse_args(arguments or None)
+    print(json.dumps(build(parsed.output), indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

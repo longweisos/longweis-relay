@@ -1,68 +1,108 @@
 # Longweis Relay
 
-**Keep premium AI for the decisions that need it.**
+**Keep the premium AI workflow you trust while making long-running work more
+compute-efficient.**
 
-Longweis Relay is built for AI workflows that run longer than a single prompt. It helps organize working context and routes suitable parts of a workflow through a more efficient path, while preserving premium-model capacity for high-value reasoning and review.
+This repository is the public home of Longweis Relay and its auditable local
+client. The hosted optimization service remains separate; this source does not
+contain its memory construction, execution routing, thresholds, private prompts,
+provider configuration, calibration data, credentials, or private evaluation
+material.
 
-## Measured compute ranges
+## Open testing
 
-In our current private-beta testing, Relay has reached:
+Download Relay and register with Email or Google—no application, invitation, or
+activation code is required. A newly registered account receives a one-time
+**$10 Relay service credit**.
 
-- **Up to about 50% less premium-model compute** on suitable everyday work
-- **Up to about 90% less total model compute** on suitable long-memory work
+The application is optional. A valid application submitted with the same
+registered email earns one additional one-time **$50 Relay service credit**
+after account/application matching.
 
-These are workload-dependent upper ranges, not guarantees. Actual results depend on the task, selected premium model, usable working history, and measured Relay participation. Short or high-risk tasks may stay mostly on the premium model. Image, video, and audio generation are not included in these optimization ranges.
+Relay service credit is not cash, has no cash value, and does not cover charges
+from a user's separate premium provider.
 
-## Who it is for
+**[Download and start open testing](https://relay.longweisos.com/?utm_source=github&utm_medium=community&utm_campaign=open_testing)**
 
-Relay is designed for people who use AI for ongoing work—not just one-off questions:
+## What this source lets you verify
 
-- Developers and operators working through multi-step tasks
-- Teams with recurring, context-heavy workflows
-- People who want to keep their existing AI workflow while using compute more deliberately
+- Relay traffic is restricted to `https://api.longweisos.com`.
+- Premium-provider credentials are used only for direct requests from the
+  user's computer to the provider selected by the user.
+- Relay, premium-provider, and device-local credentials stay in native
+  operating-system credential storage, not the profile file.
+- The local OpenAI-compatible API binds only to literal IPv4 loopback.
+- Redirects are rejected before sensitive credentials or selected memory can
+  be forwarded.
+- The public client contains no hosted implementation or private memory engine.
 
-## How to access Relay
+## Public protocol v1
 
-Longweis Relay is currently available as a macOS private beta.
+Ordinary requests identify the exact contract:
 
-Use the **General API** to connect Relay with compatible AI tooling and runtimes. Access is provisioned through beta enrollment.
+```text
+longweis-relay-public-client/1
+```
 
-For setup details, see the [Getting Started guide](docs/GETTING_STARTED.md).
+The client accepts only:
+
+- a completed Relay response with a non-empty charge receipt; or
+- a pre-execution direct-premium fallback with no Relay charge.
+
+Unknown protocol versions, unknown outcomes, and malformed billing state fail
+closed. See [the protocol](docs/PROTOCOL_V1.md) and
+[threat model](docs/THREAT_MODEL.md).
+
+## Client development and verification
+
+The v0.1.0 candidate supports Python 3.9 or later and has no runtime package
+dependencies.
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+python3 scripts/audit_public_tree.py
+PYTHONPATH=src python3 -m longweis_relay_client doctor --offline
+PYTHONPATH=src python3 -m longweis_relay_client egress
+PYTHONPATH=src python3 -m longweis_relay_client doctor
+```
+
+Configuration, registration, and live requests remain explicit user actions.
+The audit commands do not read or print credentials.
 
 ## Compatibility status
 
-We list a runtime as supported only after exercising it against Relay with real prompts, tools, files, multiple turns, or concurrent work. Protocol compatibility by itself is not counted as proof.
+Verified compatibility currently covers:
 
-### Tested and supported
+- OpenClaw
+- OpenCode 1.18.30
+- Aider 0.82.3
+- AutoGen 0.7.5
 
-- **OpenClaw** — short and long tasks, multi-turn work, tool use, concurrency, and recovery paths
-- **OpenCode 1.18.30** — long prompts, tool calls, four-way concurrency, and cross-turn continuity; parallel workers use isolated state directories
-- **Aider 0.82.3** — basic calls, real file edits, cross-turn goal retention, and three-way concurrent work
-- **AutoGen 0.7.5** — real function-tool execution and three-way concurrent tool turns
+OpenHands 0.9.8 coverage is expanding; it is not yet claimed as supported.
 
-### Coverage expanding — 持续补充中
+## Measured compute ranges
 
-- **OpenHands 0.9.8** — downloaded for testing, but startup is blocked by an unavailable historical E2B dependency; Relay compatibility is not yet judged
-- **Image, video, and audio generation** — not optimized by Relay in the current release
-- **Windows and Linux desktop clients** — not included in the current Apple-silicon Mac private beta
-- **More OpenAI-compatible runtimes** — added to the supported list only after repeatable compatibility tests
+Relay has reached up to about **50% less premium-model compute** on suitable
+everyday work and up to about **90% less total model compute** on suitable
+long-memory work. These are verified upper ranges, not guarantees. Results
+depend on the task, selected premium model, usable history, and measured Relay
+participation.
 
-Compatibility reflects the tested versions and scenarios above; it is not a guarantee for every release, plugin, provider, model, or workload.
+## Releases and contributions
 
-## Private beta
+The local v0.1.0 candidate has deterministic wheel/source archives, SHA-256
+checksums, an SPDX SBOM, clean-install verification, and CI gates. No package
+release is represented as published until its tag and artifacts are visible in
+this repository.
 
-Request access at **[relay.longweisos.com](https://relay.longweisos.com/)**.
-
-During the beta, we are focused on reliability across real long-running workflows, clear usage visibility, and practical compatibility.
-
-## About this repository
-
-This repository is the public home for Longweis Relay documentation, release notes, compatibility information, and product updates. It is not a promise that every implementation component is open source.
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and the
+[release process](docs/RELEASE.md) before contributing or testing an archive.
 
 ## Support
 
-For beta access or product support: [longweis.app@gmail.com](mailto:longweis.app@gmail.com)
+Use [SUPPORT.md](SUPPORT.md) for public-client questions. Report security,
+privacy, billing, refund, commercial, or media matters privately to
+`longweis.app@gmail.com`.
 
----
-
-A Longweis product.
+Apache License 2.0. Longweis Relay service use is governed separately by its
+service terms.
