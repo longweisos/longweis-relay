@@ -1,7 +1,6 @@
 """Single-instance background lifecycle for the local Relay API."""
 
 import errno
-import fcntl
 import json
 import os
 import signal
@@ -13,6 +12,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, Optional, Sequence
+
+try:
+    import fcntl
+except ImportError:  # Windows has no POSIX advisory locking.
+    fcntl = None
 
 from .client_errors import IntegrityConflict, ProjectSError, ValidationError
 from .client_local_api import LOCAL_API_HOST, LOCAL_API_MODEL, LOCAL_API_PORT
@@ -116,6 +120,10 @@ class BackgroundInstanceLock:
         self._descriptor = None
 
     def acquire(self) -> None:
+        if fcntl is None:
+            raise ValidationError(
+                "background service locking is unavailable on this platform"
+            )
         self.paths.ensure()
         lock = Path(self.paths.lock)
         if lock.is_symlink():
@@ -150,7 +158,7 @@ class BackgroundInstanceLock:
     def release(self) -> None:
         descriptor = self._descriptor
         self._descriptor = None
-        if descriptor is not None:
+        if descriptor is not None and fcntl is not None:
             fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
 

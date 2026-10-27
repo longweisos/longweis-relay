@@ -49,8 +49,9 @@ class LocalBridgeProfileTests(unittest.TestCase):
             )
             self.assertNotIn("relay-secret", encoded)
             self.assertNotIn("premium-secret", encoded)
-            self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
-            self.assertEqual(os.stat(Path(path).parent).st_mode & 0o777, 0o700)
+            if os.name == "posix":
+                self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+                self.assertEqual(os.stat(Path(path).parent).st_mode & 0o777, 0o700)
             self.assertEqual(store.load(), profile)
 
     def test_integrity_hash_detects_profile_tampering(self):
@@ -79,6 +80,8 @@ class LocalBridgeProfileTests(unittest.TestCase):
                 LocalBridgeProfileStore(str(link))
 
     def test_shared_permissions_fail_closed_without_changing_them(self):
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are not available")
         with tempfile.TemporaryDirectory() as temp_dir:
             shared = Path(temp_dir) / "shared"
             shared.mkdir(mode=0o755)

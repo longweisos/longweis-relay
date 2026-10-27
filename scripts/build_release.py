@@ -26,6 +26,13 @@ SDIST_NAME = "longweis-relay-client-%s.tar.gz" % VERSION
 WHEEL_NAME = "longweis_relay_client-%s-py3-none-any.whl" % VERSION
 
 
+def _single_artifact(directory: Path, pattern: str) -> Path:
+    matches = sorted(directory.glob(pattern))
+    if len(matches) != 1 or not matches[0].is_file():
+        raise ValueError("build produced an unexpected artifact set for %s" % pattern)
+    return matches[0]
+
+
 def _safe_name(value: str) -> PurePosixPath:
     path = PurePosixPath(value)
     if path.is_absolute() or not path.parts or any(part in ("", ".", "..") for part in path.parts):
@@ -135,8 +142,13 @@ def build(output: Path) -> Dict[str, object]:
             env=environment,
             check=True,
         )
-        _normalize_sdist(staging / SDIST_NAME, output / SDIST_NAME)
-        _normalize_wheel(staging / WHEEL_NAME, output / WHEEL_NAME)
+        # Setuptools normalizes the distribution name with either hyphens or
+        # underscores depending on the installed release.  Accept exactly one
+        # archive of each type, then publish our fixed canonical filenames.
+        _normalize_sdist(
+            _single_artifact(staging, "*.tar.gz"), output / SDIST_NAME
+        )
+        _normalize_wheel(_single_artifact(staging, "*.whl"), output / WHEEL_NAME)
     subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "verify_release.py"), str(output)],
         cwd=str(ROOT),

@@ -54,6 +54,7 @@ class RetryController(FakeController):
         return self.status()
 
 
+@unittest.skipUnless(os.name == "posix", "background daemon is POSIX-only")
 class ClientBackgroundTests(unittest.TestCase):
     def make_paths(self):
         root = tempfile.mkdtemp(prefix="relay-bg-", dir="/tmp")

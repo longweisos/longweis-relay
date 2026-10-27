@@ -2,6 +2,8 @@ name: public-client-ci
 
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -25,6 +27,17 @@ jobs:
           PYTHONPATH: src
       - run: python scripts/audit_public_tree.py
       - run: python -m longweis_relay_client doctor --offline
+        if: runner.os != 'Linux'
+        env:
+          PYTHONPATH: src
+      - name: Verify headless Linux preflight fails closed without a secret store
+        if: runner.os == 'Linux'
+        run: |
+          set +e
+          python -m longweis_relay_client doctor --offline
+          doctor_status=$?
+          set -e
+          test "$doctor_status" -eq 1
         env:
           PYTHONPATH: src
       - run: python -m longweis_relay_client egress

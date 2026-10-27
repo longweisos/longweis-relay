@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -111,7 +112,8 @@ class ClientUpdateTests(unittest.TestCase):
             initial = UpdatePreferences()
             stored = checked_preferences(initial, now)
             store.save(stored)
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            if os.name == "posix":
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertFalse(should_check_automatically(store.load(), now + timedelta(hours=1)))
             delayed = remind_tomorrow(store.load(), now)
             store.save(delayed)

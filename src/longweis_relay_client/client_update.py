@@ -143,7 +143,11 @@ class UpdatePreferencesStore:
     def load(self) -> UpdatePreferences:
         if not self.path.exists():
             return UpdatePreferences()
-        if self.path.is_symlink() or not self.path.is_file() or self.path.stat().st_mode & 0o077:
+        if (
+            self.path.is_symlink()
+            or not self.path.is_file()
+            or (os.name == "posix" and self.path.stat().st_mode & 0o077)
+        ):
             raise ValidationError("update preferences are unsafe")
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
@@ -173,7 +177,8 @@ class UpdatePreferencesStore:
         if root.exists() and (not root.is_dir() or root.is_symlink()):
             raise ValidationError("update preference directory is unsafe")
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(root, 0o700)
+        if os.name == "posix":
+            os.chmod(root, 0o700)
         payload = {
             "automatic_checks": preferences.automatic_checks,
             "automatic_downloads": preferences.automatic_downloads,
@@ -183,15 +188,20 @@ class UpdatePreferencesStore:
         }
         descriptor, temporary = tempfile.mkstemp(prefix=".update-", dir=str(root))
         try:
-            os.fchmod(descriptor, 0o600)
+            if os.name == "posix":
+                os.fchmod(descriptor, 0o600)
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                descriptor = -1
                 json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, self.path)
-            os.chmod(self.path, 0o600)
+            if os.name == "posix":
+                os.chmod(self.path, 0o600)
         finally:
+            if descriptor >= 0:
+                os.close(descriptor)
             try:
                 os.unlink(temporary)
             except FileNotFoundError:
