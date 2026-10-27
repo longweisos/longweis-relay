@@ -15,6 +15,7 @@ import tarfile
 import tempfile
 import zipfile
 from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version as distribution_version
 from pathlib import Path, PurePosixPath
 from typing import Dict, Sequence
 
@@ -24,6 +25,26 @@ VERSION = "0.1.0"
 SOURCE_DATE_EPOCH = 1793059200
 SDIST_NAME = "longweis-relay-client-%s.tar.gz" % VERSION
 WHEEL_NAME = "longweis_relay_client-%s-py3-none-any.whl" % VERSION
+SDIST_ROOT = SDIST_NAME[: -len(".tar.gz")]
+BUILD_TOOL_VERSIONS = {
+    "setuptools": "79.0.1",
+    "wheel": "0.48.0",
+}
+
+
+def _verify_build_tools() -> None:
+    mismatches = []
+    for package, expected in sorted(BUILD_TOOL_VERSIONS.items()):
+        try:
+            actual = distribution_version(package)
+        except PackageNotFoundError:
+            actual = "not installed"
+        if actual != expected:
+            mismatches.append("%s==%s (found %s)" % (package, expected, actual))
+    if mismatches:
+        raise RuntimeError(
+            "release build requires the pinned tools: %s" % ", ".join(mismatches)
+        )
 
 
 def _single_artifact(directory: Path, pattern: str) -> Path:
@@ -56,9 +77,18 @@ def _normalized_mode(mode: int, directory: bool = False) -> int:
 
 def _normalize_sdist(source: Path, destination: Path) -> None:
     entries = []
+    source_root = None
     with tarfile.open(source, "r:gz") as archive:
         for item in archive.getmembers():
-            _safe_name(item.name)
+            original = _safe_name(item.name)
+            if source_root is None:
+                source_root = original.parts[0]
+            elif original.parts[0] != source_root:
+                raise ValueError("source archive has multiple top-level roots")
+            if len(original.parts) == 1 and not item.isdir():
+                raise ValueError("source archive root is not a directory")
+            normalized = PurePosixPath(SDIST_ROOT, *original.parts[1:])
+            _safe_name(str(normalized))
             if item.issym() or item.islnk() or item.isdev() or item.isfifo():
                 raise ValueError("source archive contains a special file")
             if not (item.isfile() or item.isdir()):
@@ -69,7 +99,9 @@ def _normalize_sdist(source: Path, destination: Path) -> None:
                 if extracted is None:
                     raise ValueError("source archive entry is unreadable")
                 content = extracted.read()
-            entries.append((item.name, item.isdir(), item.mode, content))
+            entries.append((str(normalized), item.isdir(), item.mode, content))
+    if source_root is None:
+        raise ValueError("source archive is empty")
     with destination.open("wb") as raw:
         with gzip.GzipFile(
             filename="",
@@ -117,6 +149,7 @@ def _normalize_wheel(source: Path, destination: Path) -> None:
 
 
 def build(output: Path) -> Dict[str, object]:
+    _verify_build_tools()
     output = output.resolve()
     if output.exists():
         if output.is_symlink() or not output.is_dir() or any(output.iterdir()):

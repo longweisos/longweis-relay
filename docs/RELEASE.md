@@ -18,13 +18,14 @@ client sends.
 Build the normalized local release bundle with:
 
 ```bash
+python3 -m pip install "setuptools==79.0.1" "wheel==0.48.0"
 python3 scripts/build_release.py --output release/v0.1.0
 ```
 
-The builder uses a fixed `SOURCE_DATE_EPOCH`, normalizes archive entry order,
-ownership, permissions, and timestamps, verifies both archives, and writes
-`SHA256SUMS`. Repeating it from the same source and build-tool versions must
-produce identical archive hashes.
+The builder requires those exact build-tool versions, uses a fixed
+`SOURCE_DATE_EPOCH`, normalizes archive names, entry order, ownership,
+permissions, and timestamps, verifies both archives, and writes `SHA256SUMS`.
+Repeating it from the same source must produce identical archive hashes.
 
 Publishing a Git repository, tag, package, or release is a separate owner action.
 Building and verifying local artifacts does not publish them.
